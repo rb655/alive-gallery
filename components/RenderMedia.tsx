@@ -23,12 +23,25 @@ type ComponentProps = {
   style?: object;
 };
 
+/**
+ * Image component used inside RenderMedia.
+ *
+ * React.memo is NOT needed here because the parent (RenderMedia)
+ * is already memoized and controls when children re-render.
+ *
+ * This keeps the render tree small and prevents unnecessary
+ * component comparisons.
+ */
 const ImageComponent = ({
   src,
   style,
   currentIndex,
   index,
 }: ComponentProps) => {
+  /**
+   * Memoizing URL generation prevents recalculating URLs
+   * on every render. This avoids unnecessary string creation
+   */
   const urls = useMemo(
     () => ({
       processed: getProcessedImage(src),
@@ -45,6 +58,12 @@ const ImageComponent = ({
     setImageSrc(urls.preview);
   }, [urls]);
 
+  /**
+   * Memoized error handler to prevent new function
+   * creation on every render.
+   *
+   * Reduces unnecessary updates in the Image component.
+   */
   const handleError = useCallback(() => {
     setImageSrc((current) => {
       if (current === urls.preview) return urls.processed;
@@ -53,6 +72,12 @@ const ImageComponent = ({
     });
   }, [urls]);
 
+  /**
+   * Used to determine loading priority.
+   *
+   * Visible media receives higher priority
+   * to ensure faster decoding and rendering.
+   */
   const isVisible = index === currentIndex;
 
   return (
@@ -63,20 +88,33 @@ const ImageComponent = ({
         onError={handleError}
         contentFit="cover"
         style={styles.fillStyle}
-        transition={300} // smooth fade from placeholder to image
-        cachePolicy={"memory-disk"}
-        priority={isVisible ? "high" : "low"}
+        transition={300} //Smooth transition avoids visual flicker when switching from placeholder to image.
+        cachePolicy={"memory-disk"} //Enables memory + disk caching.
+        priority={isVisible ? "high" : "low"} // Prioritizes visible media for decoding.
       />
     </View>
   );
 };
 
+/**
+ * Video component used inside RenderMedia.
+ *
+ * Same as Image component React.memo is NOT needed here because the parent (RenderMedia)
+ * is already memoized and controls when children re-render.
+ *
+ * This keeps the render tree small and prevents unnecessary
+ * component comparisons.
+ */
 const VideoComponent = ({
   src,
   index,
   currentIndex,
   style,
 }: ComponentProps) => {
+  /**
+   * Memoizing all media URLs prevents recalculation
+   * during re-renders and keeps object references stable.
+   */
   const urls = useMemo(
     () => ({
       processed: getProcessedVideo(src),
@@ -101,12 +139,21 @@ const VideoComponent = ({
     setShowRetry(false);
   }, [urls]);
 
+  /**
+   * Video player instance.
+   */
   const player = useVideoPlayer({ uri: videoSrc }, (p) => {
     p.loop = true;
   });
 
   const isVisible = index === currentIndex;
 
+  /**
+   * Pause videos when not visible.
+   *
+   * Prevents multiple videos running
+   * which would heavily impact scroll performance.
+   */
   useEffect(() => {
     if (!isVisible) {
       player.pause();
@@ -119,19 +166,32 @@ const VideoComponent = ({
       if (status.status === "readyToPlay") {
         setIsVideoReady(true);
       }
+
       if (status.error) {
         setVideoSrc((current) => {
           if (current === urls.processed) {
             return urls.original;
           }
+
+          /**
+           * If both sources fail, show retry UI
+           * instead of continuously retrying.
+           */
           setShowRetry(true);
           return current;
         });
       }
     });
+
     return () => subscription.remove();
   }, [player, urls]);
 
+  /**
+   * Memoized thumbnail fallback logic.
+   *
+   * Prevents unnecessary re-renders caused
+   * by new callback instances.
+   */
   const handlePosterError = useCallback(() => {
     setPoster((current) => {
       if (current === urls.previewThumb) return urls.processedThumb;
@@ -140,6 +200,10 @@ const VideoComponent = ({
     });
   }, [urls]);
 
+  /**
+   * Retry handler resets video state
+   * without remounting the component.
+   */
   const handleRetry = useCallback(() => {
     setShowRetry(false);
     setIsVideoReady(false);
@@ -163,7 +227,7 @@ const VideoComponent = ({
           onError={handlePosterError}
           style={styles.absoluteFill}
           contentFit="cover"
-          cachePolicy="memory"
+          cachePolicy="memory" // Memory cache only because thumbnails ar short lived
           placeholder={Loader}
         />
       )}
@@ -184,6 +248,18 @@ const VideoComponent = ({
   );
 };
 
+/**
+ * Memoized RenderMedia component.
+ *
+ * Prevents unnecessary re-renders of media components
+ * when FlatList updates unrelated items.
+ *
+ * Only pages transitioning between:
+ * • visible → invisible
+ * • invisible → visible
+ *
+ * are allowed to re-render.
+ */
 export const RenderMedia = React.memo(
   ({
     item,
@@ -211,12 +287,21 @@ export const RenderMedia = React.memo(
       />
     );
   },
+
+  /**
+   * Custom comparison prevents re-rendering
+   * unless the visibility state of the page changes.
+   *
+   * This dramatically reduces render cost when
+   * scrolling large paginated lists.
+   */
   (prev, next) => {
     const wasVisible = prev.index === prev.currentIndex;
     const isVisible = next.index === next.currentIndex;
     return wasVisible === isVisible;
   },
 );
+
 RenderMedia.displayName = "RenderMedia";
 
 const styles = StyleSheet.create({

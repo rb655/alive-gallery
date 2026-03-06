@@ -21,6 +21,20 @@ const EmptyList = () => (
   </View>
 );
 
+/**
+ * Memoized page renderer.
+ *
+ * Each page contains multiple heavy components (images/videos).
+ * React.memo prevents unnecessary re-renders while scrolling.
+ *
+ * Custom comparison ensures the page only re-renders when its
+ * visibility state changes (visible ↔ not visible).
+ *
+ * This is important for:
+ * • preventing video re-renders
+ * • avoiding expensive media layout recalculation
+ * • keeping scroll FPS smooth
+ */
 const RenderItem = React.memo(
   ({
     item,
@@ -64,6 +78,20 @@ const RenderItem = React.memo(
       </View>
     );
   },
+
+  /**
+   * Custom memo comparison
+   *
+   * Only trigger re-render when page visibility changes.
+   *
+   * Example:
+   * Page 3 visible → becomes invisible → re-render
+   * Page 3 invisible → becomes visible → re-render
+   *
+   * If both states remain same, skip render.
+   *
+   * This dramatically reduces renders during fast scrolling.
+   */
   (prev, next) => {
     const wasVisible = prev.index === prev.currentIndex;
     const isVisible = next.index === next.currentIndex;
@@ -86,11 +114,31 @@ export default function HomeScreen() {
     handleNudgePress,
   } = useHomePage();
 
+  /**
+   * Memoized renderItem callback
+   *
+   * Prevents FlatList from receiving a new function reference
+   * on every render which would otherwise trigger list updates.
+   *
+   * Dependency: currentIndex
+   * Needed because visible page state affects media playback.
+   */
   const renderItem: ListRenderItem<PageLayout> = useCallback(
     ({ item, index }) => (
       <RenderItem item={item} index={index} currentIndex={currentIndex} />
     ),
     [currentIndex],
+  );
+
+  /**
+   * Stable key extractor
+   *
+   * Prevents unnecessary re-mounting of pages during updates.
+   * Stable keys allow React to reuse existing views.
+   */
+  const keyExtractor = useCallback(
+    (_: PageLayout, index: number) => `page-${index}`,
+    [],
   );
 
   if (isLoading) {
@@ -104,30 +152,30 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.container}>
       <FlatList
-        // Needed thing for flatlist
         data={pageData}
         renderItem={renderItem}
         ListEmptyComponent={EmptyList}
         ref={flatListRef}
-        // To make it horizontal and paginated
+        // Horizontal paginated gallery layout
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        disableIntervalMomentum
-        decelerationRate={"fast"}
-        // Performance optimizations
-        keyExtractor={(_, index) => `page-${index}`}
-        windowSize={11} // Default is 21 (viewport units). Use 5–11 for horizontal paginated lists.
-        maxToRenderPerBatch={3}
-        initialNumToRender={1}
-        removeClippedSubviews={true}
-        updateCellsBatchingPeriod={16}
-        getItemLayout={getItemLayout}
-        onViewableItemsChanged={onViewableItemsChanged}
+        disableIntervalMomentum // Disable extra momentum to keep page snapping predictable
+        decelerationRate={"fast"} // Faster deceleration improves snap behavior in paginated lists
+        // Performance optimizations props
+        keyExtractor={keyExtractor}
+        windowSize={11} // Controls how many pages are kept mounted.
+        maxToRenderPerBatch={3} // Limits render per batch
+        initialNumToRender={1} // Only render the first page initially. Reduces initial load time for media-heavy screens
+        removeClippedSubviews={true} // Unmount views outside the viewport, to reduce memory usage.
+        updateCellsBatchingPeriod={16} // Controls render batching interval (in ms).
+        getItemLayout={getItemLayout} // Skip runtime layout measurements, very helpful when item has fixed height/width
+        onViewableItemsChanged={onViewableItemsChanged} // Tracks visible page index, used for prefetching and video autoplay.
         viewabilityConfig={viewabilityConfig}
-        // Styles
         contentContainerStyle={styles.flatListContainer}
       />
+
+      {/* Scroll hint shown only on first page */}
       {pageData.length > 1 && (
         <Animated.View
           style={[styles.scrollHint, hintAnimatedStyle]}

@@ -32,8 +32,10 @@ export const useHomePage = () => {
         if (!galleryData || !galleryData.data) {
           return;
         }
+
         const pageData = createPageLayout(galleryData.data.gallery);
         setPageData(pageData);
+
         // Prefetch the very first page immediately so there's no cold-start flicker
         if (pageData[0]) prefetchItem(pageData[0]);
         if (pageData[1]) prefetchItem(pageData[1]);

@@ -9,7 +9,7 @@ import {
 
 /**
  * Maximum number of URLs to track in the prefetch cache set.
- * Once the limit is reached the oldest 20% of entries are evicted
+ * Once the limit is reached the oldest 20% of entries are removed
  * so the Set doesn't grow unbounded over a long session.
  */
 const MAX_CACHE_SIZE = 300;
@@ -20,7 +20,7 @@ const prefetchedUrls = new Set<string>();
 const safePrefetch = (url: string): void => {
   if (prefetchedUrls.has(url)) return; // already prefetched — skip
 
-  // Evict oldest entries when the set is at capacity
+  // Removed oldest entries when the set is at capacity
   if (prefetchedUrls.size >= MAX_CACHE_SIZE) {
     let evicted = 0;
     for (const key of prefetchedUrls) {
