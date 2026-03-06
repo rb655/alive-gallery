@@ -8,9 +8,11 @@ import {
   ListRenderItem,
   StyleSheet,
   Text,
+  TouchableOpacity,
   useWindowDimensions,
   View,
 } from "react-native";
+import Animated from "react-native-reanimated";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 const EmptyList = () => (
@@ -79,6 +81,9 @@ export default function HomeScreen() {
     onViewableItemsChanged,
     viewabilityConfig,
     getItemLayout,
+    flatListRef,
+    hintAnimatedStyle,
+    handleNudgePress,
   } = useHomePage();
 
   const renderItem: ListRenderItem<PageLayout> = useCallback(
@@ -103,6 +108,7 @@ export default function HomeScreen() {
         data={pageData}
         renderItem={renderItem}
         ListEmptyComponent={EmptyList}
+        ref={flatListRef}
         // To make it horizontal and paginated
         horizontal
         pagingEnabled
@@ -122,6 +128,23 @@ export default function HomeScreen() {
         // Styles
         contentContainerStyle={styles.flatListContainer}
       />
+      {pageData.length > 1 && (
+        <Animated.View
+          style={[styles.scrollHint, hintAnimatedStyle]}
+          pointerEvents={currentIndex === 0 ? "auto" : "none"}
+        >
+          <TouchableOpacity
+            onPress={handleNudgePress}
+            activeOpacity={0.7}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <View style={styles.scrollHintPill}>
+              <Text style={styles.scrollHintArrow}>›</Text>
+              <Text style={styles.scrollHintLabel}>more</Text>
+            </View>
+          </TouchableOpacity>
+        </Animated.View>
+      )}
     </SafeAreaView>
   );
 }
@@ -176,5 +199,34 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: scale(16),
     color: "#fff",
+  },
+  scrollHint: {
+    position: "absolute",
+    right: scale(12),
+    top: "5%",
+    zIndex: 10,
+  },
+  scrollHintPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: scale(4),
+    paddingHorizontal: scale(14),
+    paddingVertical: scale(8),
+    borderRadius: scale(20),
+    backgroundColor: "rgba(0,0,0,0.5)",
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.2)",
+  },
+  scrollHintArrow: {
+    color: "#fff",
+    fontSize: scale(18),
+    lineHeight: scale(20),
+    fontWeight: "300",
+  },
+  scrollHintLabel: {
+    color: "rgba(255,255,255,0.85)",
+    fontSize: scale(13),
+    fontWeight: "500",
+    letterSpacing: 0.5,
   },
 });

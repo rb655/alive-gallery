@@ -14,6 +14,8 @@ import { useVideoPlayer, VideoView } from "expo-video";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 
+const Loader = require("../assets/gifs/loading.gif");
+
 type ComponentProps = {
   src: string;
   currentIndex: number;
@@ -57,7 +59,7 @@ const ImageComponent = ({
     <View style={[styles.container, style]}>
       <Image
         source={{ uri: imageSrc }}
-        placeholder={require("../assets/gifs/loading.gif")}
+        placeholder={Loader}
         onError={handleError}
         contentFit="cover"
         style={styles.fillStyle}
@@ -101,7 +103,6 @@ const VideoComponent = ({
 
   const player = useVideoPlayer({ uri: videoSrc }, (p) => {
     p.loop = true;
-    p.muted = true;
   });
 
   const isVisible = index === currentIndex;
@@ -147,7 +148,13 @@ const VideoComponent = ({
 
   return (
     <View style={[styles.container, style]}>
-      <VideoView player={player} style={styles.fillStyle} contentFit="cover" />
+      <VideoView
+        player={player}
+        style={styles.fillStyle}
+        contentFit="cover"
+        nativeControls
+        fullscreenOptions={{ enable: true }}
+      />
 
       {/* Thumbnail shown until video is ready */}
       {!isVideoReady && (
@@ -157,6 +164,7 @@ const VideoComponent = ({
           style={styles.absoluteFill}
           contentFit="cover"
           cachePolicy="memory"
+          placeholder={Loader}
         />
       )}
 

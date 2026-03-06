@@ -2,7 +2,17 @@ import { createPageLayout } from "@/helper/dataHandler";
 import { prefetchItem } from "@/helper/preFetchHandler";
 import { PageLayout } from "@/types/types";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useWindowDimensions, ViewToken } from "react-native";
+import { FlatList, useWindowDimensions, ViewToken } from "react-native";
+import {
+  cancelAnimation,
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withSequence,
+  withTiming,
+} from "react-native-reanimated";
 
 export const useHomePage = () => {
   const [pageData, setPageData] = useState<PageLayout[]>([]);
@@ -10,6 +20,7 @@ export const useHomePage = () => {
   const [currentIndex, setCurrentIndex] = useState<number>(0);
 
   const { width } = useWindowDimensions();
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -34,6 +45,42 @@ export const useHomePage = () => {
     };
     fetchData();
   }, []);
+
+  const hintOpacity = useSharedValue(1);
+  const hintTranslateX = useSharedValue(0);
+  const hasInteracted = useRef(false);
+
+  const hideHint = useCallback(() => {
+    cancelAnimation(hintTranslateX);
+    hintOpacity.value = withTiming(0, { duration: 250 });
+  }, [hintOpacity, hintTranslateX]);
+
+  useEffect(() => {
+    if (currentIndex === 0 && !hasInteracted.current) {
+      hintOpacity.value = withTiming(1, { duration: 300 });
+      hintTranslateX.value = withRepeat(
+        withSequence(
+          withTiming(8, { duration: 500, easing: Easing.inOut(Easing.ease) }),
+          withTiming(0, { duration: 500, easing: Easing.inOut(Easing.ease) }),
+          withDelay(1400, withTiming(0, { duration: 0 })),
+        ),
+        -1,
+      );
+    } else {
+      hideHint();
+    }
+  }, [currentIndex, hideHint, hintOpacity, hintTranslateX]);
+
+  const handleNudgePress = useCallback(() => {
+    hasInteracted.current = true;
+    hideHint();
+    flatListRef.current?.scrollToIndex({ index: 1, animated: true });
+  }, [hideHint]);
+
+  const hintAnimatedStyle = useAnimatedStyle(() => ({
+    opacity: hintOpacity.value,
+    transform: [{ translateX: hintTranslateX.value }],
+  }));
 
   const onViewableItemsChanged = useCallback(
     ({
@@ -80,5 +127,8 @@ export const useHomePage = () => {
     onViewableItemsChanged,
     viewabilityConfig,
     getItemLayout,
+    flatListRef,
+    hintAnimatedStyle,
+    handleNudgePress,
   };
 };
